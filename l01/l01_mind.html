@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Сатурн з кільцями</title>
+    <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+</head>
+<body>
+     <a-scene mindar-image="imageTargetSrc:../l01/rubens.mind;" 
+             color-space="sRGB" 
+             renderer="colorManagement: true, physicallyCorrectLights" 
+             vr-mode-ui="enabled: false" 
+             device-orientation-permission-ui="enabled: false">
+        <!-- MindAR маркер з 3D контентом всередині -->
+        <a-entity mindar-image-target="targetIndex: 0">
+	   <a-entity rotation="-90 0 0" scale="0.01 0.01 0.01" position="0 0 0"></a-entity>
+	   <!-- Фон з зірками -->
+        <a-sky src="../l01/2k_stars.jpg"></a-sky>
+        
+        <!-- Джерело світла на відстані 500,000 км -->
+        <a-light type="directional" 
+                 position="500 0 0" 
+                 light="color: white; intensity: 1.5"
+                 target="#saturn-system"></a-light>
+        
+        <!-- Система Сатурна з нахилом осі 27° -->
+        <a-entity id="saturn-system" 
+                  position="0 0 -200"
+                  rotation="0 0 27"
+                  animation="property: rotation; 
+                           to: 0 360 27; 
+                           loop: true; 
+                           dur: 10000; 
+                           easing: linear">
+            
+            <!-- Сатурн з оригінальною текстурою -->
+            <a-sphere id="saturn"
+                      radius="60"
+                      src="../l01/2k_saturn.jpg"
+                      segments-height="32"
+                      segments-radial="64"
+                      material="roughness: 0.8; metalness: 0.1">
+            </a-sphere>
+            
+            <!-- Кільце D (внутрішній радіус 74.5, товщина до 137) -->
+            <!-- Використовуємо кілька концентричних кілець для імітації системи кілець -->
+            
+            <!-- Кільце D -->
+            <a-ring geometry="radiusInner: 74.5; radiusOuter: 85"
+                    material="color: #C4A484; opacity: 0.6; transparent: true; side: double"
+                    rotation="-90 0 0"></a-ring>
+            
+            <!-- Кільце C -->
+            <a-ring geometry="radiusInner: 85; radiusOuter: 100"
+                    material="color: #D4B494; opacity: 0.7; transparent: true; side: double"
+                    rotation="-90 0 0"></a-ring>
+            
+            <!-- Кільце B (найяскравіше) -->
+            <a-ring geometry="radiusInner: 100; radiusOuter: 120"
+                    material="color: #E4C4A4; opacity: 0.8; transparent: true; side: double"
+                    rotation="-90 0 0"></a-ring>
+            
+            <!-- Поділ Кассіні (темний проміжок) -->
+            <a-ring geometry="radiusInner: 120; radiusOuter: 122"
+                    material="color: #333333; opacity: 0.3; transparent: true; side: double"
+                    rotation="-90 0 0"></a-ring>
+            
+            <!-- Кільце A -->
+            <a-ring geometry="radiusInner: 122; radiusOuter: 137"
+                    material="color: #D4B494; opacity: 0.7; transparent: true; side: double"
+                    rotation="-90 0 0"></a-ring>
+            
+            <!-- Зовнішні слабкі кільця -->
+            <a-ring geometry="radiusInner: 137; radiusOuter: 145"
+                    material="color: #A48464; opacity: 0.3; transparent: true; side: double"
+                    rotation="-90 0 0"></a-ring>
+        </a-entity>
+        
+        <a-camera mindar-image-tracking="true"  position="0 0 0" look-controls="enabled: false"></a-camera>
+        
+</body>
+</html>
