@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="utf-8">
+    <title>Сатурн з кільцями - Three.js VR</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        
+        .info-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 10px;
+            z-index: 100;
+            font-size: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+        }
+        
+        .controls-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: white;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 10px;
+            z-index: 100;
+            font-size: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+        }
+        
+        .vr-button {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            z-index: 100;
+            transition: all 0.3s ease;
+        }
+        
+        .vr-button:hover {
+            background: #45a049;
+            transform: scale(1.05);
+        }
+        
+        .vr-button:disabled {
+            background: #666;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        h3 {
+            margin: 0 0 10px 0;
+            color: #87CEEB;
+            font-size: 16px;
+        }
+        
+        p {
+            margin: 5px 0;
+            line-height: 1.4;
+        }
+        
+        .highlight {
+            color: #FFD700;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    
+    <div class="info-panel">
+        <h3>🪐 Модель Сатурна</h3>
+        <p><span class="highlight">Масштаб:</span> 1:1000</p>
+        <p><span class="highlight">Радіус Сатурна:</span> 60,000 км → 60 одиниць</p>
+        <p><span class="highlight">Кільця:</span> від 74,500 км до 137,000 км</p>
+        <p><span class="highlight">Нахил осі:</span> 27°</p>
+        <p><span class="highlight">Період обертання:</span> 10.7 години</p>
+    </div>
+    
+    <div class="controls-panel">
+        <h3>🎮 Управління</h3>
+        <p><span class="highlight">Миша:</span> Обертання камери</p>
+        <p><span class="highlight">Колесо:</span> Масштабування</p>
+        <p><span class="highlight">WASD:</span> Переміщення</p>
+        <p><span class="highlight">Shift:</span> Прискорення</p>
+        <p><span class="highlight">Space:</span> Вгору</p>
+        <p><span class="highlight">C:</span> Вниз</p>
+    </div>
+    
+    <button id="vrButton" class="vr-button">Увійти в VR</button>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Глобальні змінні
+        let scene, camera, renderer, saturnSystem, saturn, rings = [];
+        let directionalLight, ambientLight;
+        let clock = new THREE.Clock();
+        let isVRSupported = false;
+        
+        // Параметри управління
+        const moveSpeed = 2;
+        const rotationSpeed = 0.01;
+        let keys = {};
+        
+        // Ініціалізація сцени
+        function init() {
+            // Створення сцени
+            scene = new THREE.Scene();
+            
+            // Налаштування камери
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 10000);
+            camera.position.set(0, 50, 300);
+            
+            // Створення рендерера
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setClearColor(0x000000);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.getElementById('container').appendChild(renderer.domElement);
+            
+            // Перевірка підтримки VR
+            checkVRSupport();
+            
+            // Створення зоряного фону
+            createStarField();
+            
+            // Створення освітлення
+            createLighting();
+            
+            // Створення системи Сатурна
+            createSaturnSystem();
+            
+            // Налаштування управління
+            setupControls();
+            
+            // Початок анімації
+            animate();
+        }
+        
+        function checkVRSupport() {
+            if ('xr' in navigator) {
+                navigator.xr.isSessionSupported('immersive-vr').then(function (supported) {
+                    isVRSupported = supported;
+                    const vrButton = document.getElementById('vrButton');
+                    if (!supported) {
+                        vrButton.textContent = 'VR не підтримується';
+                        vrButton.disabled = true;
+                    }
+                });
+            } else {
+                const vrButton = document.getElementById('vrButton');
+                vrButton.textContent = 'VR не підтримується';
+                vrButton.disabled = true;
+            }
+        }
+        
+        function createStarField() {
+            // Створення сферичного неба з текстурою зірок
+            const skyGeometry = new THREE.SphereGeometry(2000, 32, 32);
+            const loader = new THREE.TextureLoader();
+            
+            loader.load('../l02/2k_stars.jpg', function(texture) {
+                const skyMaterial = new THREE.MeshBasicMaterial({
+                    map: texture,
+                    side: THREE.BackSide // Показувати текстуру всередині сфери
+                });
+                
+                const skySphere = new THREE.Mesh(skyGeometry, skyMaterial);
+                scene.add(skySphere);
+            }, undefined, function(error) {
+                console.warn('Не вдалося завантажити текстуру зірок, використовую альтернативу');
+                // Альтернативний варіант з точками
+                createPointStars();
+            });
+        }
+        
+        function createPointStars() {
+            const starsGeometry = new THREE.BufferGeometry();
+            const starsMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 2 });
+            
+            const starsVertices = [];
+            for (let i = 0; i < 10000; i++) {
+                const x = (Math.random() - 0.5) * 4000;
+                const y = (Math.random() - 0.5) * 4000;
+                const z = (Math.random() - 0.5) * 4000;
+                starsVertices.push(x, y, z);
+            }
+            
+            starsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starsVertices, 3));
+            const stars = new THREE.Points(starsGeometry, starsMaterial);
+            scene.add(stars);
+        }
+        
+        function createLighting() {
+            // Направлене світло (Сонце)
+            directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
+            directionalLight.position.set(500, 0, 0);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            scene.add(directionalLight);
+            
+            // Амбієнтне світло
+            ambientLight = new THREE.AmbientLight(0x404040, 0.3);
+            scene.add(ambientLight);
+        }
+        
+        function createSaturnSystem() {
+            // Створення системи Сатурна з нахилом 27°
+            saturnSystem = new THREE.Group();
+            saturnSystem.position.set(0, 0, -200);
+            saturnSystem.rotation.z = THREE.MathUtils.degToRad(27);
+            
+            // Створення Сатурна
+            createSaturn();
+            
+            // Створення кілець
+            createRings();
+            
+            scene.add(saturnSystem);
+        }
+        
+        function createSaturn() {
+            const saturnGeometry = new THREE.SphereGeometry(60, 64, 32);
+            const loader = new THREE.TextureLoader();
+            
+            // Завантаження реальної текстури Сатурна
+            loader.load('../l02/2k_saturn.jpg', function(texture) {
+                const saturnMaterial = new THREE.MeshPhongMaterial({
+                    map: texture,
+                    shininess: 30,
+                    specular: 0x111111
+                });
+                
+                saturn = new THREE.Mesh(saturnGeometry, saturnMaterial);
+                saturn.castShadow = true;
+                saturn.receiveShadow = true;
+                saturnSystem.add(saturn);
+            }, undefined, function(error) {
+                console.warn('Не вдалося завантажити текстуру Сатурна, використовую процедурну');
+                // Альтернативний варіант з процедурною текстурою
+                const saturnTexture = createSaturnTexture();
+                const saturnMaterial = new THREE.MeshPhongMaterial({
+                    map: saturnTexture,
+                    shininess: 30,
+                    specular: 0x111111
+                });
+                
+                saturn = new THREE.Mesh(saturnGeometry, saturnMaterial);
+                saturn.castShadow = true;
+                saturn.receiveShadow = true;
+                saturnSystem.add(saturn);
+            });
+        }
+        
+        function createSaturnTexture() {
+            // Створення процедурної текстури Сатурна
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 256;
+            const context = canvas.getContext('2d');
+            
+            // Градієнт кольорів Сатурна
+            const gradient = context.createLinearGradient(0, 0, 0, 256);
+            gradient.addColorStop(0, '#FAD5A5');
+            gradient.addColorStop(0.3, '#F4C895');
+            gradient.addColorStop(0.6, '#E8BB85');
+            gradient.addColorStop(1, '#DCAE75');
+            
+            context.fillStyle = gradient;
+            context.fillRect(0, 0, 512, 256);
+            
+            // Додавання смуг
+            for (let i = 0; i < 256; i += 8) {
+                const alpha = 0.1 + Math.sin(i * 0.1) * 0.05;
+                context.fillStyle = `rgba(0, 0, 0, ${alpha})`;
+                context.fillRect(0, i, 512, 2);
+            }
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.repeat.x = 2;
+            return texture;
+        }
+        
+        function createRings() {
+            const ringData = [
+                { inner: 74.5, outer: 85, color: 0xC4A484, opacity: 0.6, name: 'D' },
+                { inner: 85, outer: 100, color: 0xD4B494, opacity: 0.7, name: 'C' },
+                { inner: 100, outer: 120, color: 0xE4C4A4, opacity: 0.8, name: 'B' },
+                { inner: 120, outer: 122, color: 0x333333, opacity: 0.3, name: 'Cassini' },
+                { inner: 122, outer: 137, color: 0xD4B494, opacity: 0.7, name: 'A' },
+                { inner: 137, outer: 145, color: 0xA48464, opacity: 0.3, name: 'F' }
+            ];
+            
+            ringData.forEach((ring, index) => {
+                const ringGeometry = new THREE.RingGeometry(ring.inner, ring.outer, 64);
+                const ringMaterial = new THREE.MeshBasicMaterial({
+                    color: ring.color,
+                    transparent: true,
+                    opacity: ring.opacity,
+                    side: THREE.DoubleSide
+                });
+                
+                const ringMesh = new THREE.Mesh(ringGeometry, ringMaterial);
+                ringMesh.rotation.x = -Math.PI / 2;
+                
+                // Додавання тонких частинок для реалістичності
+                if (index % 2 === 0) {
+                    addRingParticles(ring.inner, ring.outer, ring.color, ring.opacity * 0.3);
+                }
+                
+                rings.push(ringMesh);
+                saturnSystem.add(ringMesh);
+            });
+        }
+        
+        function addRingParticles(innerRadius, outerRadius, color, opacity) {
+            const particleCount = 1000;
+            const particles = new THREE.BufferGeometry();
+            const positions = [];
+            
+            for (let i = 0; i < particleCount; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const radius = innerRadius + Math.random() * (outerRadius - innerRadius);
+                const x = Math.cos(angle) * radius;
+                const z = Math.sin(angle) * radius;
+                const y = (Math.random() - 0.5) * 2;
+                
+                positions.push(x, y, z);
+            }
+            
+            particles.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            
+            const particleMaterial = new THREE.PointsMaterial({
+                color: color,
+                size: 0.5,
+                transparent: true,
+                opacity: opacity
+            });
+            
+            const particleSystem = new THREE.Points(particles, particleMaterial);
+            saturnSystem.add(particleSystem);
+        }
+        
+        function setupControls() {
+            // Обробка подій клавіатури
+            document.addEventListener('keydown', (event) => {
+                keys[event.code] = true;
+            });
+            
+            document.addEventListener('keyup', (event) => {
+                keys[event.code] = false;
+            });
+            
+            // Обробка миші
+            let mouseX = 0, mouseY = 0;
+            let isMouseDown = false;
+            
+            document.addEventListener('mousedown', (event) => {
+                isMouseDown = true;
+                mouseX = event.clientX;
+                mouseY = event.clientY;
+            });
+            
+            document.addEventListener('mouseup', () => {
+                isMouseDown = false;
+            });
+            
+            document.addEventListener('mousemove', (event) => {
+                if (isMouseDown) {
+                    const deltaX = event.clientX - mouseX;
+                    const deltaY = event.clientY - mouseY;
+                    
+                    camera.position.x = camera.position.x * Math.cos(deltaX * 0.01) - camera.position.z * Math.sin(deltaX * 0.01);
+                    camera.position.z = camera.position.x * Math.sin(deltaX * 0.01) + camera.position.z * Math.cos(deltaX * 0.01);
+                    
+                    mouseX = event.clientX;
+                    mouseY = event.clientY;
+                }
+                
+                camera.lookAt(saturnSystem.position);
+            });
+            
+            // Обробка колеса миші (зум)
+            document.addEventListener('wheel', (event) => {
+                const delta = event.deltaY > 0 ? 1.1 : 0.9;
+                camera.position.multiplyScalar(delta);
+                camera.lookAt(saturnSystem.position);
+            });
+            
+            // VR кнопка
+            document.getElementById('vrButton').addEventListener('click', () => {
+                if (isVRSupported) {
+                    // Тут би була логіка для VR, але WebXR потребує додаткових налаштувань
+                    alert('VR режим потребує додаткового налаштування WebXR');
+                }
+            });
+        }
+        
+        function handleControls() {
+            const speed = keys['ShiftLeft'] || keys['ShiftRight'] ? moveSpeed * 3 : moveSpeed;
+            
+            if (keys['KeyW']) camera.translateZ(-speed);
+            if (keys['KeyS']) camera.translateZ(speed);
+            if (keys['KeyA']) camera.translateX(-speed);
+            if (keys['KeyD']) camera.translateX(speed);
+            if (keys['Space']) camera.translateY(speed);
+            if (keys['KeyC']) camera.translateY(-speed);
+            
+            camera.lookAt(saturnSystem.position);
+        }
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            const deltaTime = clock.getDelta();
+            
+            // Обертання системи Сатурна (день = 10.7 години)
+            saturnSystem.rotation.y += 0.01 * deltaTime;
+            
+            // Обертання самого Сатурна
+            saturn.rotation.y += 0.02 * deltaTime;
+            
+            // Обробка управління
+            handleControls();
+            
+            // Анімація кілець (легке коливання прозорості)
+            rings.forEach((ring, index) => {
+                const time = clock.getElapsedTime();
+                const wave = Math.sin(time * 0.5 + index) * 0.1;
+                ring.material.opacity = Math.max(0.1, ring.material.opacity + wave * 0.01);
+            });
+            
+            renderer.render(scene, camera);
+        }
+        
+        // Обробка зміни розміру вікна
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        // Запуск програми
+        init();
+    </script>
+</body>
+</html>

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <title>AR Сатурн — MindAR + Three.js</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #000;
+    }
+    #ar-container {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
+    .info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      background: rgba(0,0,0,0.6);
+      padding: 10px;
+      font-size: 14px;
+      border-radius: 8px;
+      z-index: 10;
+    }
+  </style>
+
+  <!-- MindAR + Three.js -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.4/dist/mindar-image-three.prod.js"></script>
+</head>
+<body>
+  <div id="ar-container"></div>
+  <div class="info">
+    <strong>🪐 AR Сатурн</strong><br />
+    Наведіть камеру на маркер <code>rubens.mind</code>
+  </div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", async () => {
+      const mindarThree = new window.MINDAR.IMAGE.MindARThree({
+        container: document.querySelector("#ar-container"),
+        imageTargetSrc: "rubens.mind",
+        maxTrack: 1
+      });
+
+      const { renderer, scene, camera } = mindarThree;
+
+      // Запит дозволу на камеру
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        stream.getTracks().forEach(track => track.stop());
+      } catch (err) {
+        alert("❌ Доступ до камери заборонено або недоступний.");
+        console.error(err);
+        return;
+      }
+
+      // Додати світло
+      const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
+      scene.add(light);
+
+      // Додати anchor з маркером
+      const anchor = mindarThree.addAnchor(0);
+      const group = new THREE.Group();
+      anchor.group.add(group);
+
+      // Завантажити текстуру Сатурна
+      const loader = new THREE.TextureLoader();
+      const saturnTexture = await loader.loadAsync("2k_saturn.jpg");
+
+      // Сатурн — сфера
+      const saturn = new THREE.Mesh(
+        new THREE.SphereGeometry(0.3, 32, 32),
+        new THREE.MeshStandardMaterial({ map: saturnTexture })
+      );
+      group.add(saturn);
+
+      // Кільце — кільцева геометрія
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(0.4, 0.65, 64),
+        new THREE.MeshBasicMaterial({ color: 0xd4b494, side: THREE.DoubleSide, transparent: true, opacity: 0.6 })
+      );
+      ring.rotation.x = -Math.PI / 2;
+      group.add(ring);
+
+      // Запуск AR
+      try {
+        await mindarThree.start();
+        renderer.setAnimationLoop(() => {
+          saturn.rotation.y += 0.01;
+          renderer.render(scene, camera);
+        });
+      } catch (e) {
+        console.error("Помилка запуску MindAR:", e);
+        alert("❌ AR не вдалося запустити. Перевірте rubens.mind і доступ до камери.");
+      }
+    });
+  </script>
+</body>
+</html>
+
