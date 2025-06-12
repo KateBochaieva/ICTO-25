@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="uk">
+  <head>
+  <meta charset="UTF-8">
+    <script type="importmap">
+    {
+      "imports": {
+	"three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+	"three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+	"mindar-face-three":"https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-face-three.prod.js"
+      }
+    }
+    </script>
+    <script type="module">
+      import * as THREE from 'three';
+      import { MindARThree } from 'mindar-face-three';
+      
+      const mindarThree = new MindARThree({
+	container: document.querySelector("#container"),
+      });
+      const {renderer, scene, camera} = mindarThree;
+      
+      // Червоний ніс (anchor 1 - кінчик носа)
+      const noseAnchor = mindarThree.addAnchor(1);
+      const noseGeometry = new THREE.SphereGeometry(0.08, 16, 16);
+      const noseMaterial = new THREE.MeshBasicMaterial({color: 0xff0000});
+      const nose = new THREE.Mesh(noseGeometry, noseMaterial);
+      nose.position.z = 0.05;
+      noseAnchor.group.add(nose);
+      
+      // Усмішка (anchor 2 - рот)
+      const mouthAnchor = mindarThree.addAnchor(2);
+      
+      // Створюємо усмішку з кривої
+      const smileCurve = new THREE.EllipseCurve(
+        0, 0,            // ax, aY
+        0.15, 0.08,      // xRadius, yRadius
+        Math.PI * 0.1,   // aStartAngle
+        Math.PI * 0.9,   // aEndAngle
+        false,           // aClockwise
+        0                // aRotation
+      );
+      
+      const smilePoints = smileCurve.getPoints(50);
+      const smileGeometry = new THREE.BufferGeometry().setFromPoints(smilePoints);
+      const smileMaterial = new THREE.LineBasicMaterial({
+        color: 0xff0000,
+        linewidth: 8
+      });
+      const smile = new THREE.Line(smileGeometry, smileMaterial);
+      smile.position.y = -0.02;
+      mouthAnchor.group.add(smile);
+      
+      // Сльози під очима (anchor 3 і 4 - ліве та праве око)
+      const leftEyeAnchor = mindarThree.addAnchor(3);
+      const rightEyeAnchor = mindarThree.addAnchor(4);
+      
+      // Ліва сльоза
+      const tearGeometry = new THREE.ConeGeometry(0.02, 0.06, 8);
+      const tearMaterial = new THREE.MeshBasicMaterial({color: 0x0088ff});
+      
+      const leftTear = new THREE.Mesh(tearGeometry, tearMaterial);
+      leftTear.position.set(-0.05, -0.1, 0);
+      leftTear.rotation.z = Math.PI;
+      leftEyeAnchor.group.add(leftTear);
+      
+      // Права сльоза
+      const rightTear = new THREE.Mesh(tearGeometry, tearMaterial);
+      rightTear.position.set(0.05, -0.1, 0);
+      rightTear.rotation.z = Math.PI;
+      rightEyeAnchor.group.add(rightTear);
+      
+      // Блискітки навколо очей
+      const sparkleGeometry = new THREE.SphereGeometry(0.01, 8, 8);
+      const sparkleMaterial = new THREE.MeshBasicMaterial({
+        color: 0xffff00,
+        transparent: true,
+        opacity: 0.8
+      });
+      
+      // Створюємо кілька блискіток навколо лівого ока
+      for(let i = 0; i < 6; i++) {
+        const sparkle = new THREE.Mesh(sparkleGeometry, sparkleMaterial);
+        const angle = (i / 6) * Math.PI * 2;
+        sparkle.position.set(
+          Math.cos(angle) * 0.08,
+          Math.sin(angle) * 0.06,
+          0.02
+        );
+        leftEyeAnchor.group.add(sparkle);
+      }
+      
+      // Блискітки навколо правого ока
+      for(let i = 0; i < 6; i++) {
+        const sparkle = new THREE.Mesh(sparkleGeometry, sparkleMaterial);
+        const angle = (i / 6) * Math.PI * 2;
+        sparkle.position.set(
+          Math.cos(angle) * 0.08,
+          Math.sin(angle) * 0.06,
+          0.02
+        );
+        rightEyeAnchor.group.add(sparkle);
+      }
+      
+      // Рожеві щоки
+      const leftCheekAnchor = mindarThree.addAnchor(5);  // ліва щока
+      const rightCheekAnchor = mindarThree.addAnchor(6); // права щока
+      
+      const cheekGeometry = new THREE.CircleGeometry(0.06, 16);
+      const cheekMaterial = new THREE.MeshBasicMaterial({
+        color: 0xff69b4,
+        transparent: true,
+        opacity: 0.6
+      });
+      
+      const leftCheek = new THREE.Mesh(cheekGeometry, cheekMaterial);
+      leftCheek.position.set(-0.08, -0.02, 0.01);
+      leftCheekAnchor.group.add(leftCheek);
+      
+      const rightCheek = new THREE.Mesh(cheekGeometry, cheekMaterial);
+      rightCheek.position.set(0.08, -0.02, 0.01);
+      rightCheekAnchor.group.add(rightCheek);
+      
+      // Анімація блискіток
+      let time = 0;
+      
+      const start = async() => {
+	await mindarThree.start();
+	renderer.setAnimationLoop(() => {
+          time += 0.02;
+          
+          // Анімуємо блискітки
+          leftEyeAnchor.group.children.forEach((child, index) => {
+            if(index > 0) { // пропускаємо сльозу
+              child.material.opacity = 0.5 + 0.3 * Math.sin(time + index);
+              child.scale.setScalar(1 + 0.2 * Math.sin(time * 2 + index));
+            }
+          });
+          
+          rightEyeAnchor.group.children.forEach((child, index) => {
+            if(index > 0) { // пропускаємо сльозу
+              child.material.opacity = 0.5 + 0.3 * Math.sin(time + index);
+              child.scale.setScalar(1 + 0.2 * Math.sin(time * 2 + index));
+            }
+          });
+          
+          // Анімуємо ніс
+          nose.scale.setScalar(1 + 0.1 * Math.sin(time * 3));
+          
+	  renderer.render(scene, camera);
+	});
+      }
+      
+      const startButton = document.querySelector("#startButton");
+      const stopButton = document.querySelector("#stopButton");
+      
+      startButton.addEventListener("click", () => {
+	start();
+      });
+      
+      stopButton.addEventListener("click", () => {
+	mindarThree.stop();
+	mindarThree.renderer.setAnimationLoop(null);
+      });
+    </script>
+    <style>
+      body {
+	margin: 0;
+        font-family: Arial, sans-serif;
+        background: linear-gradient(135deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4);
+        background-size: 400% 400%;
+        animation: gradientShift 8s ease infinite;
+      }
+      
+      @keyframes gradientShift {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+      }
+      
+      #container {
+	width: 100vw;
+	height: 100vh;
+	position: relative;
+	overflow: hidden;
+        border-radius: 20px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+      }
+      
+      #control {
+	position: fixed;
+	top: 20px;
+	left: 20px;
+	z-index: 2;
+        display: flex;
+        gap: 10px;
+      }
+      
+      button {
+        padding: 12px 24px;
+        border: none;
+        border-radius: 25px;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+      }
+      
+      #startButton {
+        background: linear-gradient(45deg, #ff6b6b, #ff8e53);
+        color: white;
+      }
+      
+      #startButton:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(255,107,107,0.4);
+      }
+      
+      #stopButton {
+        background: linear-gradient(45deg, #667eea, #764ba2);
+        color: white;
+      }
+      
+      #stopButton:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102,126,234,0.4);
+      }
+      
+      #info {
+        position: fixed;
+        bottom: 20px;
+        left: 20px;
+        right: 20px;
+        background: rgba(255,255,255,0.9);
+        padding: 15px;
+        border-radius: 15px;
+        text-align: center;
+        color: #333;
+        font-size: 14px;
+        z-index: 2;
+        backdrop-filter: blur(10px);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="control">
+      <button id="startButton">🎪 Почати</button>
+      <button id="stopButton">⏹️ Зупинити</button>
+    </div>
+    <div id="container">
+    </div>
+    <div id="info">
+      🤡 Маска Клоуна AR • Дозвольте доступ до камери та посміхніться! 🎭
+    </div>
+  </body>
+</html>
