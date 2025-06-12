@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- ES‑module‑shims – потрібен для import‑map у Safari/старих Chrome -->
+    <script async
+            src="https://ga.jspm.io/npm:es-module-shims@1.5.1/dist/es-module-shims.js"
+            crossorigin="anonymous"></script>
+
+    <!-- import‑map: одна (!) копія Three + шляхи до add‑ons і MindAR -->
+    <script type="importmap">
+    {
+      "imports": {
+        "three"            : "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/"    : "https://unpkg.com/three@0.160.0/examples/jsm/",
+        "mindar-image-three": "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"
+      }
+    }
+    </script>
+
+    <style>
+      html,body { margin:0; height:100%; overflow:hidden; }
+    </style>
+  </head>
+
+  <body>
+    <script type="module">
+      /* ---------- ES‑модульний код ---------- */
+      import * as THREE from 'three';
+      import { GLTFLoader }      from 'three/addons/loaders/GLTFLoader.js';
+      import { MindARThree }     from 'mindar-image-three';
+
+      const start = async () => {
+        /* 1. Ініціалізуємо MindAR ------------------------- */
+        const mindarThree = new MindARThree({
+          container      : document.body,
+          imageTargetSrc : 'targets.mind',   // два маркери
+          maxTrack       : 2
+        });
+        const { renderer, scene, camera } = mindarThree;
+
+        /* 2. Світло --------------------------------------- */
+        scene.add( new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1) );
+
+        /* 3. Маркер 0 → відео ----------------------------- */
+        const video      = document.createElement('video');
+        video.src        = 'video.mp4';   // або будь‑яке інше
+        video.loop       = true;  video.muted = true;
+        const vTexture   = new THREE.VideoTexture(video);
+        const vMaterial  = new THREE.MeshBasicMaterial({ map:vTexture });
+        const vMesh      = new THREE.Mesh(
+                              new THREE.PlaneGeometry(1, 0.56), vMaterial);
+        const vAnchor    = mindarThree.addAnchor(0);
+        vAnchor.group.add(vMesh);
+        vAnchor.onTargetFound = () => video.play();
+        vAnchor.onTargetLost  = () => video.pause();
+
+        /* 4. Маркер 1 → Angry Bird (GLB) ------------------ */
+        const gAnchor    = mindarThree.addAnchor(1);
+        const gltf       = await new GLTFLoader().loadAsync('angry_bird.glb');
+        gltf.scene.scale.set(0.5,0.5,0.5);
+        gltf.scene.position.set(0,-0.3,0);
+        gAnchor.group.add(gltf.scene);
+
+        /* 5. Старт циклу ---------------------------------- */
+        await mindarThree.start();
+        renderer.setAnimationLoop(() => renderer.render(scene, camera));
+      };
+
+      /* Стартуємо після завантаження DOM */
+      window.addEventListener('DOMContentLoaded', start);
+    </script>
+  </body>
+</html>
+
+
+
+
+
+
